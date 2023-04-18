@@ -40,9 +40,7 @@ Here, Helm will automatically get the cluster details by reading the default kub
 I am performing all the above steps after configuring the Kubernetes cluster, so this is the most required step to have a Kubernetes cluster pre-setup.
 
 If you want to know how to set up a multi-node Kubernetes cluster using Ansible, follow the above blog:
-Automating Kubernetes Cluster Using Ansible
-This article will give you a brief idea of how we can automate an entire Kubernetes Cluster Configuration using…
-shubham134.medium.com
+https://github.com/bijualbert/k8s_ansible_wordpress_mysql/blob/main/README.md
 
 After installing the helm, the next step would be creating a Chart.
 You have to create a directory and the name of the folder/directory will be the name of your chart that you are going to create.
@@ -69,23 +67,190 @@ I have launched the above File System on the top of AWS:
 
 Here are the YAML files for every component:
 Service for Grafana:
+grafana-service.yml 
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+spec:
+  selector:
+    env: dev
+    dc: IN
+  type: NodePort
+  ports:
+  - nodePort: {{ .Values.grafanaPort }}
+    port: 3000
 
 Here, in the value of NodePort, I have used a variable’s reference. We will get to know how to create this variable further in this blog.
+
 Service for Prometheus:
+prometheus-service.yml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-service
+spec:
+  selector:
+    env: prod
+    dc: IN
+  type: NodePort
+  ports:
+  - nodePort: {{ .Values.prometheusPort }}
+    port: 9090
 
 PV for Grafana:
+grafana-pv.yml
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: grafana-pv
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 2Gi
+  accessModes:
+  - ReadWriteOnce
+  nfs:
+    server: "{{ .Values.grafanaNFS }}"
+    path: "/"
 
 PV for Prometheus:
+prometheus-pv.yml
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: prometheus-pv
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 2Gi
+  accessModes:
+  - ReadWriteOnce
+  nfs:
+    server: "{{ .Values.prometheusNFS }}"
+    path: "/"
 
 PVC for Grafana:
+grafana-pvc.yml
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-pvc
+  labels:
+    env: dev
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+
 
 PVC for Prometheus:
+prometheus-pvc.yml
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-pvc
+  labels:
+    env: prod
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
 
 Deployment for Grafana:
+grafana-deployment.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana-deployment
+spec:
+  selector:
+    matchLabels:
+      env: dev
+      dc: IN
+  template: 
+    metadata: 
+      labels:
+        env: dev
+        dc: IN
+    spec:
+      containers:
+      - name: grafana-con
+        image: monitoringartist/grafana-xxl:latest
+        ports:
+        - containerPort: 3000
+        volumeMounts:
+        - name: mypvc
+          mountPath: /var/lib/grafana
+      volumes:
+      - name: mypvc
+        persistentVolumeClaim:
+          claimName: grafana-pvc
 
 Config Map for Prometheus:
+prometheus-cm.yml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-cm
+data:
+  prometheus.yml: |-
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    scrape_configs:
+      - job_name: 'localhost'
+        static_configs:
+        - targets: ['localhost:9090']
 
 Deployment for Prometheus:
+prometheus-deployment.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-deployment
+spec:
+  selector:
+    matchLabels:
+      env: prod
+      dc: IN
+  template: 
+    metadata: 
+      labels:
+        env: prod
+        dc: IN
+    spec:
+      containers:
+      - name: prometheus-con
+        image: prom/prometheus
+        ports:
+        - containerPort: 9090
+        volumeMounts:
+        - name: prom-pvc
+          mountPath: /prometheus/data
+        - name: prom-cm
+          mountPath: /etc/prometheus/prometheus.yml
+          subPath: prometheus.yml
+      volumes:
+      - name: prom-pvc
+        persistentVolumeClaim:
+          claimName: prometheus-pvc
+      - name: prom-cm
+        configMap:
+          name: prometheus-cm
 
 After all the YAML files have been created, the next step is to take care of the variables.
 You might have seen that I have used a lot of variables at different places in the above YAML files. Where are these variables going to be declared?
@@ -93,17 +258,32 @@ There is a fixed file called ‘values.yaml’ in the chart directory and we hav
 touch values.yaml
 Content of the values.yaml file:
 
+grafanaPort: 31001
+prometheusPort: 31002
+grafanaNFS: 172.31.35.144
+prometheusNFS: 172.31.24.109
+
 In the same location, we have to create a ‘Chart.yaml’ file and inside this file, we will provide the version details of our app. We can say that this is the configuration file of the Helm.
 Content of the ‘Chart.yaml’ file:
 
+apiVersion: v1
+name: prom-grafana
+version: 0.1
+appversion: 1.0
+description: Integration of prometheus and grafana
 
 And here comes the final step, to deploy all the above resources, all we need to do is to install this chart. Use the above command to do so:
 heml install prom-grafana /helm-ws/prom-grafana
 After running the above command, both the Prometheus and Grafana will be deployed. Here is the status:
+>> kubectl get all
+>> kubectl get pv
+>> kubectl get pvc
 
 
 
 Congratulations! All the desired resources have been successfully deployed, just in one click. Here is the result:
+https://3.6.37.15:31001/login
+https://3.6.37.15:31002/targets
 
 SUMMARY
 
