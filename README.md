@@ -68,7 +68,7 @@ I have launched the above File System on the top of AWS:
 Here are the YAML files for every component:
 Service for Grafana:
 grafana-service.yml 
-
+```
 apiVersion: v1
 kind: Service
 metadata:
@@ -81,12 +81,12 @@ spec:
   ports:
   - nodePort: {{ .Values.grafanaPort }}
     port: 3000
-
+```
 Here, in the value of NodePort, I have used a variable’s reference. We will get to know how to create this variable further in this blog.
 
 Service for Prometheus:
 prometheus-service.yml
-
+```
 apiVersion: v1
 kind: Service
 metadata:
@@ -99,10 +99,10 @@ spec:
   ports:
   - nodePort: {{ .Values.prometheusPort }}
     port: 9090
-
+```
 PV for Grafana:
 grafana-pv.yml
-
+```
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -116,10 +116,10 @@ spec:
   nfs:
     server: "{{ .Values.grafanaNFS }}"
     path: "/"
-
+```
 PV for Prometheus:
 prometheus-pv.yml
-
+```
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -133,10 +133,10 @@ spec:
   nfs:
     server: "{{ .Values.prometheusNFS }}"
     path: "/"
-
+```
 PVC for Grafana:
 grafana-pvc.yml
-
+```
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -150,10 +150,10 @@ spec:
     requests:
       storage: 2Gi
 
-
+```
 PVC for Prometheus:
 prometheus-pvc.yml
-
+```
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -166,10 +166,10 @@ spec:
   resources:
     requests:
       storage: 2Gi
-
+```
 Deployment for Grafana:
 grafana-deployment.yml
-
+```
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -197,10 +197,10 @@ spec:
       - name: mypvc
         persistentVolumeClaim:
           claimName: grafana-pvc
-
+```
 Config Map for Prometheus:
 prometheus-cm.yml
-
+```
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -214,10 +214,10 @@ data:
       - job_name: 'localhost'
         static_configs:
         - targets: ['localhost:9090']
-
+```
 Deployment for Prometheus:
 prometheus-deployment.yml
-
+```
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -251,39 +251,41 @@ spec:
       - name: prom-cm
         configMap:
           name: prometheus-cm
-
+```
 After all the YAML files have been created, the next step is to take care of the variables.
 You might have seen that I have used a lot of variables at different places in the above YAML files. Where are these variables going to be declared?
 There is a fixed file called ‘values.yaml’ in the chart directory and we have to declare all the variables in this file only.
 touch values.yaml
 Content of the values.yaml file:
-
+```
 grafanaPort: 31001
 prometheusPort: 31002
 grafanaNFS: 172.31.35.144
 prometheusNFS: 172.31.24.109
-
+```
 In the same location, we have to create a ‘Chart.yaml’ file and inside this file, we will provide the version details of our app. We can say that this is the configuration file of the Helm.
 Content of the ‘Chart.yaml’ file:
-
+```
 apiVersion: v1
 name: prom-grafana
 version: 0.1
 appversion: 1.0
 description: Integration of prometheus and grafana
-
+```
 And here comes the final step, to deploy all the above resources, all we need to do is to install this chart. Use the above command to do so:
 heml install prom-grafana /helm-ws/prom-grafana
 After running the above command, both the Prometheus and Grafana will be deployed. Here is the status:
+```
 >> kubectl get all
 >> kubectl get pv
 >> kubectl get pvc
-
-
+```
 
 Congratulations! All the desired resources have been successfully deployed, just in one click. Here is the result:
+```
 https://3.6.37.15:31001/login
 https://3.6.37.15:31002/targets
+```
 
 SUMMARY
 
